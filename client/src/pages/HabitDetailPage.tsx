@@ -1,23 +1,32 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Flame, Trophy, Check } from "lucide-react";
+import { ArrowLeft, Flame, Trophy, Check, Clock } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import { Habit, CheckIn } from "../types";
 import { fetchHabit, fetchCheckIns, checkIn as checkInApi } from "../services/habits";
 import { extractApiErrorMessage } from "../services/api";
+import { AppShell } from "../components/AppShell";
 import { ErrorBanner } from "../components/ErrorBanner";
-import { formatTodayInTimezone, formatDateReadable } from "../utils/date";
+import { DayTrail } from "../components/DayTrail";
+import { HabitCalendar } from "../components/HabitCalendar";
+import { BackfillForm } from "../components/BackfillForm";
+import { HabitCardSkeleton } from "../components/Skeleton";
+import { formatTodayInTimezone, formatDateReadable, formatTimeOfDay } from "../utils/date";
 
 export function HabitDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { showToast, ToastViewport } = useToast();
+
   const [habit, setHabit] = useState<Habit | null>(null);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [checkInSubmitting, setCheckInSubmitting] = useState(false);
 
-  const [backfillDate, setBackfillDate] = useState("");
+  const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [backfillSubmitting, setBackfillSubmitting] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -41,147 +50,149 @@ export function HabitDetailPage() {
   async function handleCheckInToday() {
     if (!id || !user) return;
     setError(null);
-    setSubmitting(true);
+    setCheckInSubmitting(true);
     try {
       const today = formatTodayInTimezone(user.timezone);
-      await checkInApi(id, today);
+      const result = await checkInApi(id, today);
       await load();
+      showToast("Habit completed", `+1 day added — streak is now ${result.currentStreak}.`);
     } catch (err) {
       setError(extractApiErrorMessage(err));
     } finally {
-      setSubmitting(false);
+      setCheckInSubmitting(false);
     }
   }
 
-  async function handleBackfill(e: FormEvent) {
-    e.preventDefault();
-    if (!id || !backfillDate) return;
-    setError(null);
-    setSubmitting(true);
+  async function handleBackfill(date: string) {
+    if (!id) return;
+    setBackfillError(null);
+    setBackfillSubmitting(true);
     try {
-      await checkInApi(id, backfillDate);
-      setBackfillDate("");
+      await checkInApi(id, date);
       await load();
+      showToast("Check-in added", `${formatDateReadable(date)} is now recorded.`);
     } catch (err) {
-      // Backend errors here map directly to the assignment's required
-      // messages: FUTURE_DATE, DATE_BEFORE_HABIT, DUPLICATE_CHECK_IN.
-      setError(extractApiErrorMessage(err));
+      // Maps directly to the backend's FUTURE_DATE / DATE_BEFORE_HABIT / DUPLICATE_CHECK_IN messages.
+      setBackfillError(extractApiErrorMessage(err));
     } finally {
-      setSubmitting(false);
+      setBackfillSubmitting(false);
     }
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading…</div>;
+    return (
+      <AppShell>
+        <HabitCardSkeleton />
+      </AppShell>
+    );
   }
 
   if (!habit) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500">
+      <AppShell>
         <ErrorBanner message={error ?? "Habit not found."} />
-      </div>
+      </AppShell>
     );
   }
 
   const today = user ? formatTodayInTimezone(user.timezone) : "";
-  const maxBackfillDate = today;
-  const minBackfillDate = habit.createdAt.slice(0, 10);
+  const localDates = checkIns.map((c) => c.localDate);
+  const mostRecentCheckIn = checkIns[0];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <Link to="/dashboard" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1.5">
-            <ArrowLeft size={16} /> Back to dashboard
-          </Link>
+    <AppShell>
+      <ToastViewport />
+
+      <Link
+        to="/dashboard"
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink"
+      >
+        <ArrowLeft size={15} /> Back to dashboard
+      </Link>
+
+      {error && (
+        <div className="mb-4">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
         </div>
-      </header>
+      )}
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-2">
-          <ErrorBanner message={error} />
-        </div>
+      <div className="mb-5 rounded-lg border border-line bg-surface p-6">
+        <h1 className="text-lg font-semibold text-ink">{habit.name}</h1>
+        {habit.description && <p className="mt-1 text-sm text-ink-muted">{habit.description}</p>}
 
-        <div className="bg-white border border-slate-200 rounded-xl p-6 mb-6">
-          <h1 className="text-xl font-semibold text-slate-900">{habit.name}</h1>
-          {habit.description && <p className="text-slate-500 mt-1">{habit.description}</p>}
-
-          <div className="flex items-center gap-6 mt-4">
-            <span className="flex items-center gap-1.5 text-orange-600 font-medium">
-              <Flame size={18} /> {habit.currentStreak} day streak
-            </span>
-            <span className="flex items-center gap-1.5 text-amber-600 font-medium">
-              <Trophy size={18} /> Best: {habit.longestStreak}
-            </span>
-          </div>
-
-          <div className="mt-4">
-            {habit.completedToday ? (
-              <button
-                disabled
-                className="rounded-lg bg-green-50 text-green-700 border border-green-200 py-2 px-4 text-sm font-medium flex items-center gap-1.5 cursor-default"
-              >
-                <Check size={16} /> Completed today
-              </button>
-            ) : (
-              <button
-                onClick={handleCheckInToday}
-                disabled={submitting}
-                className="rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white py-2 px-4 text-sm font-medium"
-              >
-                {submitting ? "Checking in…" : "Check in for today"}
-              </button>
-            )}
-          </div>
+        <div className="mt-4 flex items-center gap-5">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-amber-600">
+            <Flame size={16} /> {habit.currentStreak} day streak
+          </span>
+          <span className="flex items-center gap-1.5 text-sm font-medium text-ink-muted">
+            <Trophy size={16} /> {habit.longestStreak} best
+          </span>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-6 mb-6">
-          <h2 className="font-semibold text-slate-900 mb-1">Backfill a missed day</h2>
-          <p className="text-sm text-slate-500 mb-4">
-            Pick a past date between when this habit was created and today.
-          </p>
-          <form onSubmit={handleBackfill} className="flex items-end gap-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-              <input
-                type="date"
-                required
-                min={minBackfillDate}
-                max={maxBackfillDate}
-                value={backfillDate}
-                onChange={(e) => setBackfillDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
+        <div className="mt-4">
+          <DayTrail completedDates={localDates} todayLocalDate={today} showLabels />
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          {habit.completedToday ? (
             <button
-              type="submit"
-              disabled={submitting || !backfillDate}
-              className="rounded-lg bg-slate-800 hover:bg-slate-900 disabled:opacity-60 text-white text-sm font-medium px-4 py-2"
+              disabled
+              className="flex cursor-default items-center gap-1.5 rounded-md border border-good-600/25 bg-good-50 px-4 py-2 text-sm font-medium text-good-600"
             >
-              Backfill
+              <Check size={15} /> Completed today
             </button>
-          </form>
+          ) : (
+            <button
+              onClick={handleCheckInToday}
+              disabled={checkInSubmitting}
+              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {checkInSubmitting ? "Checking in…" : "Check in for today"}
+            </button>
+          )}
+          {mostRecentCheckIn && (
+            <span className="flex items-center gap-1 font-mono text-xs text-ink-faint">
+              <Clock size={12} /> last: {formatTimeOfDay(mostRecentCheckIn.checkedInAt)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <BackfillForm
+          minDate={habit.createdAt.slice(0, 10)}
+          maxDate={today}
+          submitting={backfillSubmitting}
+          error={backfillError}
+          onSubmit={handleBackfill}
+        />
+      </div>
+
+      <div className="rounded-lg border border-line bg-surface p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink">History</h2>
+          <span className="font-mono text-xs text-ink-faint">{checkIns.length} total check-ins</span>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="font-semibold text-slate-900 mb-4">History</h2>
-          {checkIns.length === 0 ? (
-            <p className="text-sm text-slate-500">No check-ins yet.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
+        {checkIns.length === 0 ? (
+          <p className="text-sm text-ink-muted">No check-ins yet.</p>
+        ) : (
+          <>
+            <HabitCalendar completedDates={localDates} todayLocalDate={today} />
+            <ul className="mt-5 divide-y divide-line border-t border-line">
               {checkIns.map((c) => (
-                <li key={c.localDate} className="py-2.5 flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-slate-700">
-                    <Check size={14} className="text-green-600" />
+                <li key={c.localDate} className="flex items-center justify-between py-2.5 text-sm">
+                  <span className="flex items-center gap-2 text-ink">
+                    <Check size={14} className="text-good-600" aria-hidden="true" />
                     {formatDateReadable(c.localDate)}
                   </span>
-                  <span className="text-slate-400">{c.localDate}</span>
+                  <span className="font-mono text-xs text-ink-faint">{c.localDate}</span>
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-      </main>
-    </div>
+          </>
+        )}
+      </div>
+    </AppShell>
   );
 }

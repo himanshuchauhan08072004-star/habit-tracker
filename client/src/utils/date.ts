@@ -28,3 +28,8 @@ export function formatDateReadable(localDate: string): string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
+
+/** Display-only: formats an ISO instant as a wall-clock time, browser-local. Never used for business logic. */
+export function formatTimeOfDay(isoInstant: string): string {
+  return new Date(isoInstant).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}

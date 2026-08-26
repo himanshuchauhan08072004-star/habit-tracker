@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { createApp } from "../app";
 
+import { formatInTimeZone } from "date-fns-tz";
+
 let mongod: MongoMemoryServer;
 const app = createApp();
 
@@ -89,7 +91,7 @@ describe("habits + check-ins", () => {
     expect(habitRes.status).toBe(201);
     const habitId = habitRes.body.data.id;
 
-    const todayLocal = new Date().toISOString().slice(0, 10); // close enough for IST-run tests
+    const todayLocal = formatInTimeZone(new Date(), "Asia/Kolkata", "yyyy-MM-dd");
 
     const checkInRes = await request(app)
       .post(`/api/habits/${habitId}/check-ins`)

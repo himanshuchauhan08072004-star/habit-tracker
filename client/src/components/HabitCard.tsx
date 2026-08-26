@@ -1,54 +1,79 @@
 import { Link } from "react-router-dom";
-import { Flame, Trophy, Check } from "lucide-react";
+import { Flame, Trophy, Check, ArrowRight } from "lucide-react";
 import { Habit } from "../types";
+import { DayTrail } from "./DayTrail";
 
 interface Props {
   habit: Habit;
+  todayLocalDate: string;
+  recentCompletedDates: string[];
   onCheckIn: (id: string) => void;
   checkingIn: boolean;
 }
 
-export function HabitCard({ habit, onCheckIn, checkingIn }: Props) {
+export function HabitCard({
+  habit,
+  todayLocalDate,
+  recentCompletedDates,
+  onCheckIn,
+  checkingIn,
+}: Props) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <Link to={`/habits/${habit.id}`} className="font-semibold text-slate-900 hover:text-brand-600">
-            {habit.name}
-          </Link>
-          {habit.description && (
-            <p className="text-sm text-slate-500 mt-0.5">{habit.description}</p>
-          )}
-        </div>
+    <div
+      className={[
+        "flex flex-col rounded-lg border bg-surface p-5 shadow-card transition-colors",
+        habit.completedToday ? "border-good-600/25" : "border-line",
+      ].join(" ")}
+    >
+      <div className="min-w-0">
+        <h3 className="truncate font-medium text-ink">{habit.name}</h3>
+        {habit.description && (
+          <p className="mt-0.5 truncate text-sm text-ink-muted">{habit.description}</p>
+        )}
       </div>
 
-      <div className="flex items-center gap-4 mt-4 text-sm">
-        <span className="flex items-center gap-1 text-orange-600 font-medium">
-          <Flame size={16} /> {habit.currentStreak} day{habit.currentStreak === 1 ? "" : "s"}
+      <div className="mt-3.5 flex items-center gap-4 text-sm">
+        <span className="flex items-center gap-1.5 font-medium text-amber-600">
+          <Flame size={15} aria-hidden="true" />
+          {habit.currentStreak} day{habit.currentStreak === 1 ? "" : "s"} streak
         </span>
-        <span className="flex items-center gap-1 text-amber-600 font-medium">
-          <Trophy size={16} /> Best: {habit.longestStreak}
+        <span className="flex items-center gap-1.5 font-medium text-ink-muted">
+          <Trophy size={15} aria-hidden="true" />
+          {habit.longestStreak} best
         </span>
       </div>
+
+      {todayLocalDate && (
+        <div className="mt-3.5">
+          <DayTrail completedDates={recentCompletedDates} todayLocalDate={todayLocalDate} showLabels />
+        </div>
+      )}
 
       <div className="mt-4">
         {habit.completedToday ? (
           <button
             disabled
-            className="w-full rounded-lg bg-green-50 text-green-700 border border-green-200 py-2 text-sm font-medium flex items-center justify-center gap-1.5 cursor-default"
+            className="flex w-full cursor-default items-center justify-center gap-1.5 rounded-md border border-good-600/25 bg-good-50 py-2 text-sm font-medium text-good-600"
           >
-            <Check size={16} /> Completed today
+            <Check size={15} aria-hidden="true" /> Completed today
           </button>
         ) : (
           <button
             onClick={() => onCheckIn(habit.id)}
             disabled={checkingIn}
-            className="w-full rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white py-2 text-sm font-medium transition-colors"
+            className="w-full rounded-md bg-brand-600 py-2 text-sm font-medium text-white transition-all hover:-translate-y-px hover:bg-brand-700 hover:shadow-card disabled:pointer-events-none disabled:opacity-60"
           >
             {checkingIn ? "Checking in…" : "Check in for today"}
           </button>
         )}
       </div>
+
+      <Link
+        to={`/habits/${habit.id}`}
+        className="mt-3 flex items-center justify-center gap-1 text-xs font-medium text-ink-faint transition-colors hover:text-brand-700"
+      >
+        View history <ArrowRight size={12} aria-hidden="true" />
+      </Link>
     </div>
   );
 }

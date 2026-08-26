@@ -73,6 +73,30 @@ describe("streak.service", () => {
     });
   });
 
+  describe("currentStreak — audit cases A-D (today = 2026-08-25)", () => {
+    const today = "2026-08-25";
+
+    it("Case A: ends today -> 4", () => {
+      const dates = ["2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25"];
+      expect(computeStreaks(dates, today).currentStreak).toBe(4);
+    });
+
+    it("Case B: ends yesterday -> 3", () => {
+      const dates = ["2026-08-22", "2026-08-23", "2026-08-24"];
+      expect(computeStreaks(dates, today).currentStreak).toBe(3);
+    });
+
+    it("Case C: gap before yesterday -> 0", () => {
+      const dates = ["2026-08-21", "2026-08-22"];
+      expect(computeStreaks(dates, today).currentStreak).toBe(0);
+    });
+
+    it("Case D: yesterday logged but gap two days back -> 2", () => {
+      const dates = ["2026-08-20", "2026-08-21", "2026-08-23", "2026-08-24"];
+      expect(computeStreaks(dates, today).currentStreak).toBe(2);
+    });
+  });
+
   describe("isCompletedToday", () => {
     it("reflects whether today's local date has a check-in", () => {
       expect(isCompletedToday(["2026-08-24"], "2026-08-24")).toBe(true);
