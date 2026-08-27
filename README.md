@@ -318,3 +318,4 @@ elapsed time) is what defines a "day" here.
 - Pagination on check-in history for habits with very long histories.
 - A CI workflow running `npm test` on push.
 - A real calendar-grid view instead of a flat history list.
+- Timezone-aware notifications reminding users to check in.
