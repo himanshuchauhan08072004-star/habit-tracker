@@ -1,6 +1,6 @@
 # Habit Tracker
 
-A full-stack habit tracker where users define habits, check in once per
+A full-stack habit tracker where users define there daily habits, check in once per
 local calendar day, and see accurately computed current/longest streaks —
 all timezone logic resolved on the server.
 
